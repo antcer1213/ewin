@@ -1,0 +1,816 @@
+#!/usr/bin/env python
+# encoding: utf-8
+import os
+import sys
+import elementary as elm
+import evas
+import argparse
+import subprocess
+from evas import EVAS_HINT_FILL, EVAS_HINT_EXPAND
+
+
+"""                 eWin
+
+A GUI-frontend for chntpw.
+By: AntCer (bodhidocs@gmail.com)
+
+Started: July 30, 2013
+"""
+HOME = os.getenv("HOME")
+_ = str
+
+parser = argparse.ArgumentParser(prog='ewin', description=_('A GUI-frontend for chntpw built in Python-EFLs.'))
+clargs = vars(parser.parse_args())
+
+
+
+class eWin(object):
+#----------Graphic User Interface
+
+#~ OS Stage
+
+    def __init__(self, args=False):
+        win = self.win = elm.StandardWindow("ewin", "eWin")
+        win.callback_delete_request_add(lambda o: elm.exit())
+
+        vbox = self.vbox = elm.Box(win)
+        vbox.size_hint_align_set(-1.0, -1.0)
+        vbox.size_hint_weight_set(1.0, 1.0)
+        vbox.show()
+
+        self.probe_create()
+
+        bt = elm.Button(win)
+        bt.text = "Refresh"
+        bt.size_hint_weight_set(1.0, 0.0)
+        bt.size_hint_align_set(-1.0, -1.0)
+        bt.callback_clicked_add(lambda o: self.gl(True))
+        vbox.pack_end(bt)
+        bt.show()
+
+        bt = elm.Button(win)
+        bt.text = "Quit"
+        bt.size_hint_weight_set(1.0, 0.0)
+        bt.size_hint_align_set(-1.0, -1.0)
+        bt.callback_clicked_add(lambda o: elm.exit())
+        vbox.pack_end(bt)
+        bt.show()
+
+        win.resize_object_add(vbox)
+        win.resize(450, 350)
+        win.show()
+
+#~ User Stage
+
+    def dubclick(self, maingl, item):
+        SAM = item.data['SAM']
+        users, info = self.fetch_info(SAM)
+
+        box = elm.Box(self.win)
+        box.padding_set(0 , 5)
+        box.size_hint_weight_set(1.0, 1.0)
+        box.show()
+
+        iw = elm.InnerWindow(self.win)
+        iw.content_set(box)
+        iw.show()
+        iw.activate()
+
+        midbox = elm.Box(self.win)
+        midbox.padding_set(5, 0)
+        midbox.horizontal_set(True)
+        midbox.size_hint_weight_set(1.0, 0.0)
+        midbox.size_hint_align_set(-1.0, -1.0)
+        box.pack_end(midbox)
+        midbox.show()
+
+        leftbox = elm.Box(self.win)
+        leftbox.size_hint_weight_set(1.0, 1.0)
+        leftbox.size_hint_align_set(-1.0, -1.0)
+        midbox.pack_end(leftbox)
+        leftbox.show()
+
+        ic = elm.Icon(self.win)
+        ic.standard_set(item.data['icon'])
+        ic.size_hint_weight_set(1.0, 1.0)
+        ic.size_hint_align_set(-1.0, -1.0)
+        leftbox.pack_end(ic)
+        ic.show()
+
+        sep = elm.Separator(self.win)
+        midbox.pack_end(sep)
+        sep.show()
+
+        rightbox = elm.Box(self.win)
+        rightbox.padding_set(0, 1)
+        rightbox.size_hint_weight_set(1.0, 1.0)
+        rightbox.size_hint_align_set(-1.0, -1.0)
+        midbox.pack_end(rightbox)
+        rightbox.show()
+
+        lb  = elm.Label(self.win)
+        lb.style = "marker"
+        lb.color = 170, 170, 170, 255
+        lb.text = '<b>%s Policy Limits</b>'%item.data['name']
+        lb.size_hint_weight_set(1.0, 0.0)
+        lb.size_hint_align_set(-1.0, -1.0)
+        rightbox.pack_end(lb)
+        lb.show()
+
+        if info:
+            for i in info:
+                horbox = elm.Box(self.win)
+                horbox.horizontal_set(True)
+                horbox.size_hint_weight_set(1.0, 1.0)
+                horbox.size_hint_align_set(-1.0, -1.0)
+                rightbox.pack_end(horbox)
+                horbox.show()
+
+                lb  = elm.Label(self.win)
+                lb.text = '- %s:'%i.split(':')[0].strip()
+                lb.size_hint_weight_set(1.0, 1.0)
+                lb.size_hint_align_set(-1.0, -1.0)
+                horbox.pack_end(lb)
+                lb.show()
+
+                lb  = elm.Label(self.win)
+                lb.text = i.split(':')[1].strip()
+                lb.size_hint_weight_set(0.0, 1.0)
+                lb.size_hint_align_set(1.0, -1.0)
+                horbox.pack_end(lb)
+                lb.show()
+
+        gl = elm.Genlist(self.win)
+        gl.size_hint_weight_set(1.0, 1.0)
+        gl.size_hint_align_set(-1.0, -1.0)
+        gl.callback_clicked_double_add(self.userclick)
+        gl.show()
+
+        def username(obj, part, data):
+            return data['user']
+
+        for user in users:
+            data = {'user': user, 'SAM': SAM}
+            itc = elm.GenlistItemClass(item_style="default", text_get_func=username)
+            gl.item_append(itc, data, None)
+
+        sc = elm.Scroller(self.win)
+        sc.content_set(gl)
+        sc.policy_set(0, 0)
+        sc.size_hint_weight_set(EVAS_HINT_EXPAND, EVAS_HINT_EXPAND)
+        sc.size_hint_align_set(EVAS_HINT_FILL, EVAS_HINT_FILL)
+        box.pack_end(sc)
+        sc.show()
+
+        bt = elm.Button(self.win)
+        bt.text = "Back"
+        bt.size_hint_weight_set(1.0, 0.0)
+        bt.size_hint_align_set(-1.0, -1.0)
+        bt.callback_clicked_add(lambda o: iw.delete())
+        box.pack_end(bt)
+        bt.show()
+
+#~ User Info Stage
+
+    def userclick(self, gl, item):
+        def lst_add(lst, label, listing=False):
+            if listing:
+                lst.item_append('%s: '%label)
+                for x in listing:
+                    lst.item_append("            %s" %x)
+            else:
+                lst.item_append(label)
+
+        SAM = item.data['SAM']
+        user = item.data['user']
+        info, order = self.fetch_user_info(SAM, user)
+
+        box = elm.Box(self.win)
+        box.padding_set(0 , 5)
+        box.size_hint_weight_set(1.0, 1.0)
+        box.show()
+
+        lb  = elm.Label(self.win)
+        lb.style = "marker"
+        lb.color = 170, 170, 170, 255
+        lb.text = "<b>User Information of '%s'</b>"%user
+        lb.size_hint_weight_set(1.0, 0.0)
+        lb.size_hint_align_set(-1.0, -1.0)
+        box.pack_end(lb)
+        lb.show()
+
+        iw = elm.InnerWindow(self.win)
+        iw.content_set(box)
+        iw.show()
+        iw.activate()
+
+        lb  = elm.Entry(self.win)
+        lb.single_line_set(True)
+        lb.scrollable_set(True)
+        information = "** Locked (Guess): %s"%info['Locked']
+        if info['Critical']:
+            for x in info['Critical']:
+                information = "%s  %s"%(information, x)
+        else:
+            lb.editable_set(False)
+        lb.text = '<b>%s</b>'%information
+        lb.size_hint_weight_set(1.0, 0.0)
+        lb.size_hint_align_set(-1.0, -1.0)
+        box.pack_end(lb)
+        lb.show()
+
+        lst = elm.List(self.win)
+        lst.size_hint_align_set(-1.0, -1.0)
+        lst.size_hint_weight_set(1.0, 1.0)
+        for i in order:
+            if info[i]:
+                if type(info[i]) is list:
+                    lst_add(lst, i, info[i])
+                else:
+                    lst_add(lst, '%s:  %s'%(i, info[i]))
+        lst.select_mode_set(2)
+        lst.scroller_policy_set(elm.ELM_SCROLLER_POLICY_AUTO, elm.ELM_SCROLLER_POLICY_AUTO)
+        box.pack_end(lst)
+        lst.show()
+
+        horbox = elm.Box(self.win)
+        horbox.horizontal_set(True)
+        horbox.size_hint_weight_set(1.0, 0.0)
+        horbox.size_hint_align_set(-1.0, -1.0)
+        box.pack_end(horbox)
+        horbox.show()
+
+        bt = elm.Button(self.win)
+        bt.text = "Clear"
+        bt.tooltip_text_set("Clears Password (blank pw)")
+        bt.size_hint_weight_set(1.0, 0.0)
+        bt.size_hint_align_set(-1.0, -1.0)
+        bt.callback_clicked_add(lambda o: self.actionclick(SAM, user, 1, iw))
+        horbox.pack_end(bt)
+        bt.show()
+
+        bt = elm.Button(self.win)
+        bt.text = "Edit"
+        bt.tooltip_text_set("Edits Password (CAUTION)")
+        bt.size_hint_weight_set(1.0, 0.0)
+        bt.size_hint_align_set(-1.0, -1.0)
+        bt.callback_clicked_add(lambda o: self.actionclick(SAM, user, 2, iw))
+        horbox.pack_end(bt)
+        bt.show()
+
+        bt = elm.Button(self.win)
+        bt.text = "Promote"
+        bt.tooltip_text_set("Promote User (to admin)")
+        bt.size_hint_weight_set(1.0, 0.0)
+        bt.size_hint_align_set(-1.0, -1.0)
+        bt.callback_clicked_add(lambda o: self.actionclick(SAM, user, 3, iw))
+        horbox.pack_end(bt)
+        bt.show()
+
+        bt = elm.Button(self.win)
+        bt.text = "Unlock"
+        bt.tooltip_text_set("Unlock Account")
+        bt.size_hint_weight_set(1.0, 0.0)
+        bt.size_hint_align_set(-1.0, -1.0)
+        bt.callback_clicked_add(lambda o: self.actionclick(SAM, user, 4, iw))
+        horbox.pack_end(bt)
+        bt.show()
+
+        bt = elm.Button(self.win)
+        bt.text = "Back"
+        bt.size_hint_weight_set(1.0, 0.0)
+        bt.size_hint_align_set(-1.0, -1.0)
+        bt.callback_clicked_add(lambda o: iw.delete())
+        box.pack_end(bt)
+        bt.show()
+
+#~ Action Stage
+
+    def actionclick(self, SAM, user, number, oldiw):
+        box = elm.Box(self.win)
+        box.padding_set(0 , 5)
+        box.size_hint_weight_set(1.0, 1.0)
+        box.show()
+
+        if number == 1:
+            action = "Clear Password of '%s'"%user
+        elif number == 2:
+            action = "Edit Password of '%s' - <b>CAUTION</b>"%user
+        elif number == 3:
+            action = "Promote User '%s' - <b>EXPERIMENTAL</b>"%user
+        else:
+            action = "Unlock/Enable Account of '%s'"%user
+
+        lb  = elm.Label(self.win)
+        lb.style = "marker"
+        lb.color = 100, 100, 100, 255
+        lb.text = '<b>Action: %s</b>'%action
+        lb.size_hint_weight_set(1.0, 0.0)
+        lb.size_hint_align_set(-1.0, -1.0)
+        box.pack_end(lb)
+        lb.show()
+
+        iw = elm.InnerWindow(self.win)
+        iw.content_set(box)
+        iw.show()
+        iw.activate()
+
+        if number == 2:
+            pwen  = elm.Entry(self.win)
+            pwen.single_line_set(True)
+            pwen.entry = ''
+            pwen.size_hint_weight_set(1.0, 1.0)
+            pwen.password_set(True)
+            #~ pwen.elm_event_callback_add(self.entry_event)
+            pwen.size_hint_align_set(-1.0, -1.0)
+            pwen.show()
+
+            frame = elm.Frame(self.win)
+            frame.text = 'New Password:'
+            frame.content_set(pwen)
+            frame.size_hint_weight_set(1.0, 0.0)
+            frame.size_hint_align_set(-1.0, -1.0)
+            box.pack_end(frame)
+            frame.show()
+
+        else:
+            pwen = False
+
+        lb  = elm.Entry(self.win)
+        lb.scrollable_set(True)
+        lb.editable_set(False)
+        lb.entry = '<b>WARNING!</b> Editing the registry always carries risk.<ps><ps>'
+        if number == 3:
+            lb.entry_append('<b>Attention:</b> This function is still experimental, and in some cases it \
+may result in strangeness when editing user/groups in Windows. \
+Also, users (like Guest often is) may still be prevented \
+from login via security/group policies which are not changed.<ps><ps>If you still wish to continue, press <b>Execute</b>.<ps><ps>')
+        else:
+            lb.entry_append('Press <b>Execute</b> only if you sincerely wish to proceed.<ps><ps>')
+
+        lb.size_hint_weight_set(1.0, 1.0)
+        lb.size_hint_align_set(-1.0, -1.0)
+        box.pack_end(lb)
+        lb.show()
+
+        bt1 = elm.Button(self.win)
+
+        bt = elm.Button(self.win)
+        bt.text = 'Execute'
+        bt.size_hint_weight_set(1.0, 0.0)
+        bt.size_hint_align_set(-1.0, -1.0)
+        bt.callback_clicked_add(self.commit_and_execute, SAM, user, number, lb, action, bt1, pwen)
+        box.pack_end(bt)
+        bt.show()
+
+        bt1.text = 'Cancel'
+        bt1.size_hint_weight_set(1.0, 0.0)
+        bt1.size_hint_align_set(-1.0, -1.0)
+        bt1.callback_clicked_add(lambda o: iw.delete())
+        bt1.callback_clicked_add(lambda o: oldiw.delete())
+        box.pack_end(bt1)
+        bt1.show()
+
+#~ Create OS list | Refresh OS list
+
+    def gl(self, clear=False):
+        if clear:
+            self.maingl.clear()
+            self.probe_create(clear)
+            return
+
+        gl = self.maingl = elm.Genlist(self.win)
+        gl.size_hint_weight_set(1.0, 1.0)
+        gl.size_hint_align_set(-1.0, -1.0)
+        gl.callback_clicked_double_add(self.dubclick)
+        gl.show()
+
+        sc = elm.Scroller(self.win)
+        sc.content_set(gl)
+        sc.policy_set(0, 0)
+        sc.size_hint_weight_set(EVAS_HINT_EXPAND, EVAS_HINT_EXPAND)
+        sc.size_hint_align_set(EVAS_HINT_FILL, EVAS_HINT_FILL)
+        self.vbox.pack_end(sc)
+        sc.show()
+
+
+#----------Mount|Locate|Add Windows Systems
+
+#~ Create OS dictionary | check mounted filesystems for matches.
+    def probe_create(self, clear=False):
+        import subprocess
+        os_list = {}
+
+        def mount_check(os_list, nodev=False):
+            mount_lst = {}
+            output = subprocess.check_output("mount").split('\n')
+            if nodev:
+                for o in output:
+                    if o.startswith("/dev/"):
+                        os = o.split()[0]
+                        mount_lst[os] = o.split()[2]
+                        os_list[os] = False
+            else:
+                for os in os_list.keys():
+                    for o in output:
+                        if o.startswith("/dev/"):
+                            if os == o.split()[0]:
+                                mount_lst[os] = o.split()[2]
+                                break
+                            else:
+                                mount_lst[os] = False
+
+            return mount_lst
+
+
+        try:
+            self.mount_wins()
+            mounted_lst = mount_check(os_list, True)
+            first=True
+
+        except:
+            output = subprocess.check_output("os-prober")
+
+            if output:
+                found = output.split('\n')
+                for f in found:
+                    if f:
+                        info = f.split(':')
+                        if not 'Recovery' in info[1] and 'Window' in info[1]:
+                            os_list[info[0]] = info[1].replace(" (loader)", "")
+
+            if os_list == {}:
+                os_list = False
+                mounted_lst = False
+            else:
+                mounted_lst = mount_check(os_list)
+
+            first=False
+
+        if not clear:
+            self.gl()
+
+        if first:
+            self.add_wins(os_list, mounted_lst, nodev=True)
+        else:
+            self.add_wins(os_list, mounted_lst)
+
+
+#~ Mount all partitions | mount detected, non-mounted blocks with Windows
+    def mount_wins(self, os_list=False, mount_lst=False):
+        #~ from ecore import Exe
+        import subprocess
+
+        if os_list:
+            for osys in os_list.keys():
+                name = osys.split("/")[2]
+                if not os.path.isdir('/media/%s'%name):
+                    command = ['mkdir', '/media/%s'%name]
+                    subprocess.Popen(command)
+                if not mount_lst[osys]:
+                    folder = '/media/%s' %name
+                    command = ['mount', '%s'%osys, '%s'%folder]
+                    subprocess.Popen(command)
+                    mount_lst[osys] = folder
+        else:
+            output = subprocess.check_output('automount', stderr=subprocess.STDOUT, shell=True)
+            print output
+            if "refused to mount" in output:
+                output = output.split("\n")
+                for o in output:
+                    if o.startswith("            "):
+                        command = o.strip()
+                        print command
+                        p = subprocess.Popen(command)
+                        reco = p.wait()
+                        print reco
+                        break
+
+
+#~ Add detected Windows Systems to OS list
+#a - Create dict for each Windows System
+    def add_wins(self, origin, mount, add=False, nodev=False):
+        if add:
+            data = {}
+            data['device'] = origin
+            data['path'] = mount
+            data['name'] = add
+            if os.path.exists('%s/Windows/System32/config/SAM'%mount):
+                data['SAM'] = '%s/Windows/System32/config/SAM'%mount
+            elif os.path.exists('%s/WINDOWS/system32/config/SAM'%mount):
+                data['SAM'] = '%s/WINDOWS/system32/config/SAM'%mount
+            elif os.path.exists('%s/WINNT/system32/config/SAM'%mount):
+                data['SAM'] = '%s/WINNT/system32/config/SAM'%mount
+            else:
+                print("ERROR, breaks mold : %s , %s" %(add, mount))
+                elm.exit()
+                return
+
+            self.add_file(data)
+        else:
+            if origin:
+                os_list = origin
+                if nodev:
+                    for mnt in mount.keys():
+                        name = self.identify_windows(mount[mnt], mnt)
+                        os_list[mnt] = name
+                        if not os_list[mnt]:
+                            del os_list[mnt]
+                            del mount[mnt]
+                else:
+                    self.mount_wins(os_list, mount)
+            else:
+                return
+
+            print os_list
+            print mount
+
+            for osys in os_list.keys():
+                self.add_wins(osys, mount[osys], os_list[osys])
+#b - Add each Windows dict to OS list
+    def add_file(self, data):
+        itc = elm.GenlistItemClass(item_style="default", text_get_func=self.name_return, content_get_func=self.icon_return)
+        self.maingl.item_append(itc, data, None)
+#c - Return name of Windows entry for use in OS list
+    def name_return(self, obj, part, data ):
+        label = data["name"]
+        return label
+#d - Return icon of Windows entry for use in OS list
+    def icon_return(self, obj, part, data ):
+        if part == "elm.swallow.icon":
+            name = data['name']
+            f = elm.Box(self.win)
+            f.horizontal_set(True)
+            f.show()
+
+            if '8' in name:
+                icon = '/usr/share/ewin/logos/8.png'
+            elif '7' in name:
+                icon = '/usr/share/ewin/logos/7.png'
+            elif 'Vista' in name:
+                icon = '/usr/share/ewin/logos/vista.png'
+            elif 'XP' in name:
+                icon = '/usr/share/ewin/logos/xp.png'
+            elif 'NT' in name:
+                icon = '/usr/share/ewin/logos/nt.png'
+            elif 'Server' in name:
+                if '2000' in name:
+                    icon = '/usr/share/ewin/logos/2k_server.png'
+                elif '2003' in name:
+                    icon = '/usr/share/ewin/logos/2k3_server.png'
+                else:
+                    icon = '/usr/share/ewin/logos/generic.png'
+            elif '2000' in name:
+                icon = '/usr/share/ewin/logos/2k.png'
+            else:
+                icon = '/usr/share/ewin/logos/generic.png'
+
+            data['icon'] = icon
+
+            ic = elm.Icon(self.win)
+            if ic.standard_set(icon):
+                pass
+            else:
+                ic.standard_set("none")
+            ic.size_hint_weight_set(1.0, 1.0)
+            ic.size_hint_align_set(-1.0, -1.0)
+            f.pack_end(ic)
+            ic.show()
+
+            return f
+#e - Identify the version of Windows for each given mount point
+    def identify_windows(self, mount, device):
+        found = False
+        if os.path.exists(mount):
+            if os.path.exists("%s/ProgramData/Microsoft/Windows/Start Menu/Programs/StartUp"%mount):
+                name = "Windows 8"
+                found=True
+            elif os.path.exists("%s/ProgramData/Microsoft/Windows/Start Menu/Programs/Startup"%mount):
+                name = "Windows 7"
+                found=True
+            elif os.path.exists("%s/Users"%mount):
+                name = "Windows Vista"
+                found=True
+            elif os.path.exists("%s/Documents and Settings"%mount):
+                if os.path.exists("%s/boot.ini"%mount):
+                    number = device[-1]
+                    print number
+                    with open("%s/boot.ini"%mount) as file:
+                        for f in file:
+                            if f.startswith("multi"):
+                                if f.split("partition(")[1].startswith(number):
+                                    entry = f.split('"')[1]
+                                    if "XP" in entry:
+                                        name = "Windows XP"
+                                    elif ".NET" in entry:
+                                        name = "Windows 2003 Server"
+                                    elif "2000 Server" in entry:
+                                        name = "Windows 2000 Server"
+                                    elif "2000" in entry:
+                                        name = "Windows 2000"
+                                    else:
+                                        name = entry
+
+                                    found=True
+            elif os.path.exists("%s/Winnt/Profiles/All Users/Start Menu/Programs/Startup"%mount):
+                name = "Windows NT"
+                found=True
+
+        if found:
+            return name
+        else:
+            return False
+
+
+#----------Info per Stage
+
+#~ OS Info
+    def fetch_info(self, SAM):
+        import subprocess
+
+        found = []
+        info  = []
+
+        output = subprocess.check_output('chntpw %s -l'%SAM, shell=True)
+
+        if output:
+            output = output.split('\n')
+            for i, o in enumerate(output):
+                if o.startswith('| '):
+                    if not 'RID' in o:
+                        found.append(o.split()[3])
+                elif o.startswith('*'):
+                    info.append(output[i+1])
+                    info.append(output[i+2])
+                    info.append(output[i+3])
+
+        if info == []:
+            info = False
+
+        return found, info
+
+#~ User Info
+    def fetch_user_info(self, SAM, user):
+        import subprocess
+        info  = {'Membership': False}
+        attrib = []
+        groups = []
+        critical = []
+
+        output = subprocess.check_output('echo q | chntpw %s -u %s'%(SAM, user), shell=True)
+
+        if output:
+            output = output.split('\n')
+            for i, o in enumerate(output):
+                if i > 18:
+                    if o.startswith('RID'):
+                        info['RID'] = o.split(':')[1]
+                    elif o.startswith('Username'):
+                        info['User Name'] = o.split(':')[1]
+                    elif o.startswith('fullname'):
+                        if o.split(':')[1] == ' ':
+                            info['Full Name'] = False
+                        else:
+                            info['Full Name'] = o.split(':')[1]
+                    elif o.startswith('comment'):
+                        if o.split(' :')[1] == ' ':
+                            info['Comment'] = False
+                        else:
+                            info['Comment'] = o.split(':')[1]
+                    elif o.startswith('homedir'):
+                        if o.split(':')[1] == ' ':
+                            info['Home Directory'] = False
+                        else:
+                            info['Home Directory'] = o.split(':')[1]
+                    elif o.startswith('User is member'):
+                        info['Membership'] = '%s Group(s)'%o.split()[4]
+                        if o.split()[4] == '0':
+                            groups = False
+                        else:
+                            num = i+1
+                            while output[num].split()[0].isdigit():
+                                groups.append(output[num])
+                                num += 1
+                                try:
+                                    output[num].split()[0]
+                                except:
+                                    break
+                    elif o.startswith('['):
+                        for attr in o.split(' |'):
+                            if '[X]' in attr:
+                                attrib.append(attr.strip())
+                    elif o.startswith('Failed login '):
+                        info['Failed Login Count'] = o.split()[3][:-1]
+                    elif o.startswith('Total  login'):
+                        info['Total Login Count'] = o.split()[3]
+                    elif o.startswith('** '):
+                        critical.append(o)
+                    elif o.startswith(' 4'):
+                        if 'probably locked now' in o:
+                            info['Locked'] = True
+                    elif o.startswith('(4'):
+                        if 'seems unlocked already' in o:
+                            info['Locked'] = False
+
+        if critical == []:
+            critical = False
+        if attrib == []:
+            attrib = False
+        if not info['Membership']:
+            groups = False
+
+        info['Groups'] = groups
+        info['Critical'] = critical
+        info['Attributes'] = attrib
+
+        order = ['RID', 'User Name', 'Full Name', 'Comment', 'Home Directory', 'Membership', 'Groups', 'Attributes', 'Failed Login Count', 'Total Login Count']
+
+        return info, order
+
+
+#----------Execute Select Action
+
+    def commit_and_execute(self, bt, SAM, user, number, entry, action, bt1, password=False):
+        from time import sleep
+        #~ from threading import Timer
+
+        def run_command():
+            cmd = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stdin=subprocess.PIPE, stderr=subprocess.STDOUT)
+
+            print('\nCommand started.\n')
+            entry.entry_append("<b>%s : Started.</b><br>"%action)
+
+            if number == 2:
+                data = cmd.communicate("%s\n%s\ny\n"%(number, password.entry))[0].split('\n')
+                #~ sleep(1)
+            elif number == 3:
+                data = cmd.communicate("%s\ny\ny\n"%number)[0].split('\n')
+                #~ sleep(1)
+            else:
+                data = cmd.communicate("%s\ny\n"%number)[0].split('\n')
+                #~ sleep(1)
+
+            for sentence in data:
+                if sentence.startswith("Select: ") and not "NOTE:" in sentence:
+                    text = sentence.split(" > ")[1]
+                    print text
+                    entry.entry_append("<ps>%s<ps><ps>"%text)
+                elif sentence.startswith("Hives that have"):
+                    print sentence
+                    entry.entry_append("<b>%s</b><ps>"%sentence)
+                elif sentence.startswith(" #  Name"):
+                    print sentence
+                    entry.entry_append("%s<ps>"%sentence)
+                elif sentence.startswith(" 0  </media"):
+                    text = sentence.split("0 ")[1]
+                    print text
+                    entry.entry_append("%s<ps><ps>"%text.replace("<", "&lt;"))
+                elif sentence.startswith("Write hive files?"):
+                    text = "<b>Hives that have been rewritten:</b>\n"
+                    text2 = " #  Name\n%s\n"%sentence.split(":  0 ")[1]
+                    print text.replace("<b>", "").replace("</b>", "") + text2
+                    entry.entry_append("%s%s<ps>"%(text.replace("\n", "<br>"), text2.replace("<", "&lt;").replace("\n", "<br>")))
+
+            returncode = cmd.returncode
+
+            bt.delete()
+            bt1.disabled_set(False)
+            if returncode == 2:
+                print("Command done.\n")
+                entry.entry_append("<br><b>%s : Completed successfully!</b><br>"%action)
+                if number == 2:
+                    entry.entry_append("<ps><b>New Password: %s</b>"%password.entry)
+                bt1.text = "Done"
+            else:
+                print("Command encountered error.\n")
+                print("Debugging information:")
+                error_log = "%s/ewin_error.log"%HOME
+                for sentence in data:
+                    print("   %s"%sentence)
+                    subprocess.Popen("echo '%s' >> %s"%(sentence, error_log), shell=True)
+                entry.entry_append("<br><b>%s : Critical Error Encountered!</b><br>"%action)
+                entry.entry_append("<br><br>Log file created at:<br>    %s"%HOME)
+                bt1.text = "Return"
+
+        bt.disabled_set(True)
+        if password:
+            password.disabled_set(True)
+        bt1.disabled_set(True)
+        command = "chntpw %s -u %s" %(SAM, user)
+        #~ sleep(2)
+        run_command()
+        #~ t = Timer(0.7, run_command)
+        #~ t.start()
+
+
+
+
+
+#----- Main -{{{-
+if __name__ == "__main__":
+    elm.init()
+
+    eWin(None)
+
+    elm.run()
+    elm.shutdown()

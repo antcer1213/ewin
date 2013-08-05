@@ -1,0 +1,2 @@
+#!/bin/sh
+cp -f -s /usr/share/ewin/logos/generic.png /usr/share/icons/generic_windows.png

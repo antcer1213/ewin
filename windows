@@ -1,0 +1,50 @@
+#!/usr/bin/env python
+# encoding: utf-8
+import os
+import sys
+
+
+def check_for_data_parts(mount, device):
+    found = False
+    if os.path.exists(mount):
+        if os.path.exists("%s/ProgramData/Microsoft/Windows/Start Menu/Programs/StartUp"%mount):
+            name = "Windows 8"
+            found=True
+        elif os.path.exists("%s/ProgramData/Microsoft/Windows/Start Menu/Programs/Startup"%mount):
+            name = "Windows 7"
+            found=True
+        elif os.path.exists("%s/Users"%mount):
+            name = "Windows Vista"
+            found=True
+        elif os.path.exists("%s/Documents and Settings"%mount):
+            if os.path.exists("%s/boot.ini"%mount):
+                number = device[-1]
+                print number
+                with open("%s/boot.ini"%mount) as file:
+                    for f in file:
+                        if f.startswith("multi"):
+                            if f.split("partition(")[1].startswith(number):
+                                entry = f.split('"')[1]
+                                if "XP" in entry:
+                                    name = "Windows XP"
+                                elif ".NET" in entry:
+                                    name = "Windows 2003 Server"
+                                elif "2000 Server" in entry:
+                                    name = "Windows 2000 Server"
+                                elif "2000" in entry:
+                                    name = "Windows 2000"
+                                else:
+                                    name = entry
+
+                                found=True
+        elif os.path.exists("%s/Winnt/Profiles/All Users/Start Menu/Programs/Startup"%mount):
+            name = "Windows NT"
+            found=True
+
+    if found:
+        return name
+    else:
+        return False
+
+result = check_for_data_parts("/media/sda4", "/dev/sda4")
+print result

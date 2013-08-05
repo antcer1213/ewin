@@ -1,0 +1,13 @@
+[Desktop Entry]
+Name=eWin
+Exec=gksudo ewin
+Type=Application
+GenericName=Windows Registry Editor
+Comment=Allows for 'hackish' manipulation of Windows systems.
+Icon=generic_windows
+MimeType=
+Categories=System;
+Hidden=false
+NoDisplay=false
+StartupNotify=false
+Terminal=false
