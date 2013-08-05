@@ -6,6 +6,7 @@ import elementary as elm
 import evas
 import argparse
 import subprocess
+from time import sleep
 from evas import EVAS_HINT_FILL, EVAS_HINT_EXPAND
 
 
@@ -404,8 +405,6 @@ from login via security/group policies which are not changed.<ps><ps>If you stil
         def mount_check(os_list, nodev=False):
             mount_lst = {}
             output = subprocess.check_output("mount").split('\n')
-            #~ for n in output:
-				#~ print n
             if nodev:
                 for o in output:
                     if o.startswith("/dev/"):
@@ -426,7 +425,10 @@ from login via security/group policies which are not changed.<ps><ps>If you stil
 
 
         try:
-            self.mount_wins()
+            cont = False
+            cont = self.mount_wins()
+            while cont == False:
+                sleep(1)
             mounted_lst = mount_check(os_list, True)
             first=True
 
@@ -495,9 +497,12 @@ from login via security/group policies which are not changed.<ps><ps>If you stil
                         if not os.path.isdir('/media/%s'%name):
                             command = ['mkdir', '/media/%s'%name]
                             subprocess.Popen(command)
+                            sleep(1)
                         folder = '/media/%s' %name
                         command = ['mount', '%s'%o, '%s'%folder]
                         subprocess.Popen(command)
+                        sleep(1)
+            return True
 
 
 #~ Add detected Windows Systems to OS list
