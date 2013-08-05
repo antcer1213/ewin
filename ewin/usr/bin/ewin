@@ -404,6 +404,8 @@ from login via security/group policies which are not changed.<ps><ps>If you stil
         def mount_check(os_list, nodev=False):
             mount_lst = {}
             output = subprocess.check_output("mount").split('\n')
+            #~ for n in output:
+				#~ print n
             if nodev:
                 for o in output:
                     if o.startswith("/dev/"):
@@ -430,6 +432,7 @@ from login via security/group policies which are not changed.<ps><ps>If you stil
 
         except:
             output = subprocess.check_output("os-prober")
+            print "shit, what next?"
 
             if output:
                 found = output.split('\n')
@@ -458,7 +461,6 @@ from login via security/group policies which are not changed.<ps><ps>If you stil
 
 #~ Mount all partitions | mount detected, non-mounted blocks with Windows
     def mount_wins(self, os_list=False, mount_lst=False):
-        #~ from ecore import Exe
         import subprocess
 
         if os_list:
@@ -474,17 +476,28 @@ from login via security/group policies which are not changed.<ps><ps>If you stil
                     mount_lst[osys] = folder
         else:
             output = subprocess.check_output('automount', stderr=subprocess.STDOUT, shell=True)
-            print output
             if "refused to mount" in output:
+                print output
                 output = output.split("\n")
                 for o in output:
                     if o.startswith("            "):
                         command = o.strip()
                         print command
-                        p = subprocess.Popen(command)
+                        p = subprocess.Popen(command, stdout=subprocess.STDOUT, shell=True)
                         reco = p.wait()
                         print reco
                         break
+            else:
+                output = output.split("\n")
+                for o in output:
+                    if o.startswith('/dev/'):
+                        name = o.split("/")[2]
+                        if not os.path.isdir('/media/%s'%name):
+                            command = ['mkdir', '/media/%s'%name]
+                            subprocess.Popen(command)
+                        folder = '/media/%s' %name
+                        command = ['mount', '%s'%o, '%s'%folder]
+                        subprocess.Popen(command)
 
 
 #~ Add detected Windows Systems to OS list
@@ -594,7 +607,6 @@ from login via security/group policies which are not changed.<ps><ps>If you stil
             elif os.path.exists("%s/Documents and Settings"%mount):
                 if os.path.exists("%s/boot.ini"%mount):
                     number = device[-1]
-                    print number
                     with open("%s/boot.ini"%mount) as file:
                         for f in file:
                             if f.startswith("multi"):
